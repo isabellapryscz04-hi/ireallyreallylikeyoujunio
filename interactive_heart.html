@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Heart</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #000000, #1a0000);
+            font-family: 'Brush Script MT', cursive;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            overflow: hidden;
+        }
+        
+        .container {
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        canvas {
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        canvas:hover {
+            filter: drop-shadow(0 0 20px rgba(255, 0, 0, 0.5));
+        }
+        
+        .message {
+            position: absolute;
+            font-size: 2.5rem;
+            color: #ff0000;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+            opacity: 0;
+            transform: scale(0.5);
+            transition: all 0.8s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+            text-align: center;
+            font-weight: bold;
+            z-index: 10;
+            pointer-events: none;
+        }
+        
+        .message.show {
+            opacity: 1;
+            transform: scale(1);
+        }
+        
+        .cringe-text {
+            position: absolute;
+            top: 380px;
+            left: 50%;
+            transform: translateX(-50%) scale(0.5);
+            font-size: 1.2rem;
+            color: #ff0000;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+            opacity: 0;
+            transition: all 0.8s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+            text-align: center;
+            font-style: italic;
+            z-index: 10;
+            pointer-events: none;
+        }
+        
+        .cringe-text.show {
+            opacity: 1;
+            transform: translateX(-50%) scale(1);
+        }
+        
+        .equation {
+            position: absolute;
+            bottom: 50px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 1.2rem;
+            color: #fff;
+            background: rgba(0, 0, 0, 0.3);
+            padding: 10px 20px;
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+            opacity: 1;
+            transition: all 0.3s ease;
+        }
+        
+        .particles {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 5;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <canvas id="heartCanvas" width="600" height="600"></canvas>
+        <canvas id="particleCanvas" class="particles" width="600" height="600"></canvas>
+        <div id="message" class="message">you are the cos²x to my sin²x</div>
+        <div id="cringe-text" class="cringe-text">(yes, I am this cringe Junio)</div>
+        <div id="equation" class="equation">x(t) = 16sin³(t), y(t) = 13cos(t) - 5cos(2t) - 2cos(3t) - cos(4t)</div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('heartCanvas');
+        const ctx = canvas.getContext('2d');
+        const particleCanvas = document.getElementById('particleCanvas');
+        const particleCtx = particleCanvas.getContext('2d');
+        const message = document.getElementById('message');
+        const cringeText = document.getElementById('cringe-text');
+        
+        let heartPoints = [];
+        let isAnimating = false;
+        let animationProgress = 0;
+        let particles = [];
+        
+        // Generate heart points using the parametric equations
+        function generateHeartPoints() {
+            heartPoints = [];
+            for (let t = 0; t < 2 * Math.PI; t += 0.05) {
+                const x = 16 * Math.pow(Math.sin(t), 3);
+                const y = 13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t);
+                heartPoints.push({ x: x * 8 + 300, y: -y * 8 + 250 });
+            }
+        }
+        
+        // Create minimal particle effect
+        function createParticles() {
+            for (let i = 0; i < 15; i++) {
+                particles.push({
+                    x: 300 + (Math.random() - 0.5) * 200,
+                    y: 250 + (Math.random() - 0.5) * 200,
+                    vx: (Math.random() - 0.5) * 6,
+                    vy: (Math.random() - 0.5) * 6,
+                    size: Math.random() * 3 + 1,
+                    life: 1,
+                    decay: Math.random() * 0.03 + 0.02
+                });
+            }
+        }
+        
+        // Draw the heart
+        function drawHeart() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            if (heartPoints.length === 0) return;
+            
+            // Create red gradient
+            const gradient = ctx.createRadialGradient(300, 250, 0, 300, 250, 150);
+            gradient.addColorStop(0, '#ff0000');
+            gradient.addColorStop(1, '#990000');
+            
+            ctx.fillStyle = gradient;
+            ctx.strokeStyle = '#660000';
+            ctx.lineWidth = 3;
+            
+            if (!isAnimating) {
+                // Draw complete heart
+                ctx.beginPath();
+                ctx.moveTo(heartPoints[0].x, heartPoints[0].y);
+                
+                for (let i = 1; i < heartPoints.length; i++) {
+                    ctx.lineTo(heartPoints[i].x, heartPoints[i].y);
+                }
+                
+                ctx.closePath();
+                ctx.fill();
+                ctx.stroke();
+            } else {
+                // Draw broken heart animation - clean split with halves moving in opposite x directions
+                const splitOffset = animationProgress * 80; // Reduced distance for cleaner look
+                const rotationAngle = animationProgress * Math.PI * 0.2; // Reduced rotation
+                
+                // Left half - moves left and rotates around x axis
+                ctx.save();
+                ctx.translate(300 - splitOffset, 250);
+                ctx.scale(1, Math.cos(-rotationAngle));
+                ctx.translate(-300, -250);
+                ctx.beginPath();
+                
+                // Draw only the left portion of the heart
+                for (let i = 0; i < heartPoints.length; i++) {
+                    const point = heartPoints[i];
+                    if (point.x <= 300) { // Only points on the left side of center
+                        if (i === 0 || heartPoints[i-1].x > 300) {
+                            ctx.moveTo(point.x, point.y);
+                        } else {
+                            ctx.lineTo(point.x, point.y);
+                        }
+                    }
+                }
+                // Close the left half by connecting to the center line
+                ctx.lineTo(300, 150); // Top of center line
+                ctx.lineTo(300, 350); // Bottom of center line
+                ctx.closePath();
+                ctx.fill();
+                ctx.stroke();
+                ctx.restore();
+                
+                // Right half - moves right and rotates around x axis
+                ctx.save();
+                ctx.translate(300 + splitOffset, 250);
+                ctx.scale(1, Math.cos(rotationAngle));
+                ctx.translate(-300, -250);
+                ctx.beginPath();
+                
+                // Draw only the right portion of the heart
+                for (let i = 0; i < heartPoints.length; i++) {
+                    const point = heartPoints[i];
+                    if (point.x >= 300) { // Only points on the right side of center
+                        if (i === 0 || heartPoints[i-1].x < 300) {
+                            ctx.moveTo(point.x, point.y);
+                        } else {
+                            ctx.lineTo(point.x, point.y);
+                        }
+                    }
+                }
+                // Close the right half by connecting to the center line
+                ctx.lineTo(300, 350); // Bottom of center line
+                ctx.lineTo(300, 150); // Top of center line
+                ctx.closePath();
+                ctx.fill();
+                ctx.stroke();
+                ctx.restore();
+            }
+        }
+        
+        // Update and draw minimal particles
+        function updateParticles() {
+            particleCtx.clearRect(0, 0, particleCanvas.width, particleCanvas.height);
+            
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const particle = particles[i];
+                
+                particle.x += particle.vx;
+                particle.y += particle.vy;
+                particle.life -= particle.decay;
+                
+                if (particle.life <= 0) {
+                    particles.splice(i, 1);
+                    continue;
+                }
+                
+                particleCtx.save();
+                particleCtx.globalAlpha = particle.life;
+                particleCtx.fillStyle = '#ff0000';
+                particleCtx.beginPath();
+                particleCtx.arc(particle.x, particle.y, particle.size, 0, Math.PI * 2);
+                particleCtx.fill();
+                particleCtx.restore();
+            }
+        }
+        
+        // Animation loop
+        function animate() {
+            drawHeart();
+            updateParticles();
+            
+            if (isAnimating && animationProgress < 1) {
+                animationProgress += 0.03;
+                if (animationProgress >= 0.5 && !message.classList.contains('show')) {
+                    message.classList.add('show');
+                }
+                if (animationProgress >= 0.7 && !cringeText.classList.contains('show')) {
+                    cringeText.classList.add('show');
+                }
+            }
+            
+            requestAnimationFrame(animate);
+        }
+        
+        // Check if click is inside the heart
+        function isPointInHeart(x, y) {
+            if (isAnimating) return false;
+            
+            const centerX = 300;
+            const centerY = 250;
+            const distance = Math.sqrt((x - centerX) ** 2 + (y - centerY) ** 2);
+            return distance < 120;
+        }
+        
+        // Handle click events
+        canvas.addEventListener('click', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            
+            if (isPointInHeart(x, y) && !isAnimating) {
+                isAnimating = true;
+                animationProgress = 0;
+                createParticles();
+            }
+        });
+        
+        // Initialize
+        generateHeartPoints();
+        animate();
+    </script>
+</body>
+</html>
